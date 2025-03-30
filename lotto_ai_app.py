@@ -82,17 +82,22 @@ with tabs[1]:
                 st.write("🎰", c)
             st.session_state['last_generated_combos'] = basic_combos
 
-        if st.button("🔥 Generate Smart Combos"):
-            st.success("Generating hot + entropy combos...")
-            smart_df = generate_smart_combos(df, n_picks=numbers_per_draw, total=10)
-            st.dataframe(smart_df)
-            st.session_state['last_generated_combos'] = smart_df['Combo'].tolist()
+        
+if st.button("🔥 Generate Smart Combos"):
+    st.success("Generating hot + entropy combos...")
+    smart_df = generate_smart_combos(df, n_picks=numbers_per_draw, total=10)
+    st.session_state['smart_df'] = smart_df
+    st.session_state['last_generated_combos'] = smart_df['Combo'].tolist()
 
-            if st.button("📈 Score These Smart Combos"):
-                score_results = [score_combo(c, df.iloc[:, 4:10]) for c in smart_df['Combo']]
-                score_df = pd.DataFrame(score_results).sort_values(by='Total Score', ascending=False)
-                st.dataframe(score_df)
-                st.session_state['last_scored_combos'] = score_df
+if 'smart_df' in st.session_state:
+    st.dataframe(st.session_state['smart_df'])
+
+    if st.button("📈 Score These Smart Combos"):
+        score_results = [score_combo(c, df.iloc[:, 4:10]) for c in st.session_state['smart_df']['Combo']]
+        score_df = pd.DataFrame(score_results).sort_values(by='Total Score', ascending=False)
+        st.dataframe(score_df)
+        st.session_state['last_scored_combos'] = score_df
+
     else:
         st.warning("Upload a CSV file first.")
 
