@@ -1,7 +1,10 @@
+
 import streamlit as st
 import pandas as pd
+import io
 from combo_generators import generate_basic_combos, generate_smart_combos
 from backtest_engine import backtest_combos
+from combo_scorer import score_combo
 
 # --- Sidebar ---
 st.sidebar.title("🎰 Universal Lotto AI Engine")
@@ -43,27 +46,34 @@ tabs = st.tabs(["Data Overview", "Strategy Engine", "Backtesting", "Export + Sav
 with tabs[0]:
     st.subheader("📊 Draw Data Overview")
     if data_file:
-        df = pd.read_csv(data_file)
-        st.dataframe(df.head(10))
-        if st.button("Analyze Draw Data"):
-            st.success("Analyzing... 🧠")
-            try:
-                draw_cols = df.select_dtypes(include=['number']).iloc[:, :6]
-                st.write("Number of draws:", len(draw_cols))
-                st.write("Number range:", draw_cols.min().min(), "to", draw_cols.max().max())
-                st.write("Draw sum range:", draw_cols.sum(axis=1).min(), "to", draw_cols.sum(axis=1).max())
-                st.write("Average entropy (approx.):", round(draw_cols.std(axis=1).mean(), 3))
-            except:
-                st.error("Unable to process number columns. Make sure the first 6 columns are numbers.")
+        try:
+            stringio = io.StringIO(data_file.getvalue().decode("utf-8"))
+            df = pd.read_csv(stringio)
+            if df.empty:
+                st.error("The uploaded CSV is empty. Please upload a valid file.")
+            else:
+                st.dataframe(df.head(10))
+                if st.button("Analyze Draw Data"):
+                    st.success("Analyzing... 🧠")
+                    try:
+                        draw_cols = df.select_dtypes(include=['number']).iloc[:, :6]
+                        st.write("Number of draws:", len(draw_cols))
+                        st.write("Number range:", draw_cols.min().min(), "to", draw_cols.max().max())
+                        st.write("Draw sum range:", draw_cols.sum(axis=1).min(), "to", draw_cols.sum(axis=1).max())
+                        st.write("Average entropy (approx.):", round(draw_cols.std(axis=1).mean(), 3))
+                    except:
+                        st.error("Unable to process number columns. Make sure the first 6 columns are numbers.")
+        except Exception as e:
+            st.error(f"Error reading the CSV file: {e}")
     else:
         st.warning("Upload a CSV file to begin.")
 
 # Tab 2: Strategy Engine
-from combo_scorer import score_combo
 with tabs[1]:
     st.subheader("🎯 Combo Generator")
     if data_file:
-        df = pd.read_csv(data_file)
+        stringio = io.StringIO(data_file.getvalue().decode("utf-8"))
+        df = pd.read_csv(stringio)
 
         if st.button("🎲 Generate Basic Combos"):
             st.success("Generating basic combos...")
@@ -76,17 +86,13 @@ with tabs[1]:
             st.success("Generating hot + entropy combos...")
             smart_df = generate_smart_combos(df, n_picks=numbers_per_draw, total=10)
             st.dataframe(smart_df)
+            st.session_state['last_generated_combos'] = smart_df['Combo'].tolist()
 
             if st.button("📈 Score These Smart Combos"):
-
                 score_results = [score_combo(c, df.iloc[:, 4:10]) for c in smart_df['Combo']]
-
                 score_df = pd.DataFrame(score_results).sort_values(by='Total Score', ascending=False)
-
                 st.dataframe(score_df)
-
                 st.session_state['last_scored_combos'] = score_df
-            st.session_state['last_generated_combos'] = smart_df['Combo'].tolist()
     else:
         st.warning("Upload a CSV file first.")
 
@@ -94,7 +100,8 @@ with tabs[1]:
 with tabs[2]:
     st.subheader("🧪 Historical Combo Tester")
     if data_file and 'last_generated_combos' in st.session_state:
-        df = pd.read_csv(data_file)
+        stringio = io.StringIO(data_file.getvalue().decode("utf-8"))
+        df = pd.read_csv(stringio)
         st.info("Using previously generated combos for backtesting.")
         if st.button("📊 Run Backtest"):
             result_df = backtest_combos(st.session_state['last_generated_combos'], df.iloc[:, 4:10])
